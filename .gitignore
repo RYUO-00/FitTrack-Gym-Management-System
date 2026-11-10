@@ -1,0 +1,12 @@
+node_modules/
+client/dist/
+server/dist/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+coverage/
+.DS_Store
+/report/
+/2026_27_DBMS_Mini_Project_Report_Format.zip
+/passwordencode.py
