@@ -17,10 +17,11 @@ BEGIN
   IF (SELECT COUNT(*) FROM v_monthly_revenue) = 0 THEN RAISE EXCEPTION 'Monthly revenue view is empty'; END IF;
 END $$;
 
--- Exercise payment audit INSERT and UPDATE triggers inside a rolled-back transaction.
+-- Exercise payment audit INSERT/UPDATE, required references, and delete restriction.
 BEGIN;
 DO $$
 DECLARE v_payment_id INTEGER; v_subscription_id INTEGER; v_audit_count INTEGER;
+        v_rejected BOOLEAN; v_missing_payment INTEGER; v_fk_name TEXT;
 BEGIN
   SELECT subscription_id INTO v_subscription_id FROM subscriptions LIMIT 1;
   INSERT INTO payments(subscription_id,amount,payment_method,payment_status)
@@ -28,6 +29,57 @@ BEGIN
   UPDATE payments SET payment_status='PAID' WHERE payment_id=v_payment_id;
   SELECT COUNT(*) INTO v_audit_count FROM payment_audit WHERE payment_id=v_payment_id;
   IF v_audit_count <> 2 THEN RAISE EXCEPTION 'Expected two payment audit records; found %',v_audit_count; END IF;
+  IF NOT EXISTS (SELECT 1 FROM payment_audit WHERE payment_id=v_payment_id AND operation='INSERT'
+    AND old_values IS NULL AND new_values->>'payment_status'='PENDING') THEN
+    RAISE EXCEPTION 'Audit INSERT snapshot is incorrect';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM payment_audit WHERE payment_id=v_payment_id AND operation='UPDATE'
+    AND old_values->>'payment_status'='PENDING' AND new_values->>'payment_status'='PAID') THEN
+    RAISE EXCEPTION 'Audit UPDATE snapshots are incorrect';
+  END IF;
+
+  v_rejected := FALSE;
+  BEGIN
+    INSERT INTO payment_audit(payment_id,operation,new_values) VALUES(NULL,'INSERT','{}'::JSONB);
+  EXCEPTION WHEN not_null_violation THEN v_rejected := TRUE;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'Audit payment_id accepted NULL'; END IF;
+
+  -- Choose an absent integer without assuming any particular identity sequence.
+  SELECT candidate INTO v_missing_payment
+  FROM generate_series(-2147483647,-2147482648) AS candidate
+  WHERE NOT EXISTS (SELECT 1 FROM payments WHERE payment_id=candidate) LIMIT 1;
+  IF v_missing_payment IS NULL THEN RAISE EXCEPTION 'No unused test identifier available'; END IF;
+  v_rejected := FALSE;
+  BEGIN
+    INSERT INTO payment_audit(payment_id,operation,new_values) VALUES(v_missing_payment,'INSERT','{}'::JSONB);
+  EXCEPTION WHEN foreign_key_violation THEN v_rejected := TRUE;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'Audit accepted an orphan payment reference'; END IF;
+
+  v_rejected := FALSE;
+  BEGIN
+    UPDATE payment_audit SET payment_id=v_missing_payment WHERE payment_id=v_payment_id;
+  EXCEPTION WHEN foreign_key_violation THEN v_rejected := TRUE;
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'Audit UPDATE accepted an orphan payment reference'; END IF;
+
+  v_rejected := FALSE;
+  BEGIN
+    DELETE FROM payments WHERE payment_id=v_payment_id;
+  EXCEPTION WHEN foreign_key_violation OR restrict_violation THEN
+    GET STACKED DIAGNOSTICS v_fk_name = CONSTRAINT_NAME;
+    v_rejected := EXISTS (
+      SELECT 1 FROM pg_constraint WHERE conrelid='payment_audit'::regclass
+        AND conname=v_fk_name AND contype='f' AND confrelid='payments'::regclass
+        AND confdeltype='r' AND convalidated AND NOT condeferrable
+    );
+  END;
+  IF NOT v_rejected THEN RAISE EXCEPTION 'Audited payment deletion was not blocked by ON DELETE RESTRICT'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM payments WHERE payment_id=v_payment_id) OR
+     (SELECT COUNT(*) FROM payment_audit WHERE payment_id=v_payment_id) <> 2 THEN
+    RAISE EXCEPTION 'Delete restriction did not preserve the payment and its audit history';
+  END IF;
 END $$;
 ROLLBACK;
 

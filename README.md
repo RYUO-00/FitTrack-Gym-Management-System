@@ -36,6 +36,7 @@ PowerShell database initialization and seed order:
 $env:DATABASE_URL = 'postgresql://fittrack_app:change_me@localhost:5432/fittrack'
 psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -f database/01_schema.sql
 psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -f database/02_constraints_and_indexes.sql
+psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -f database/migrations/001_payment_audit_payment_fk.sql
 psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -f database/09_functions.sql
 psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -f database/10_procedures.sql
 psql $env:DATABASE_URL -v ON_ERROR_STOP=1 -f database/11_triggers.sql
@@ -88,6 +89,8 @@ All routes except login, logout, and health require an authenticated admin cooki
 | Reports | `GET /api/reports` with optional `from` and `to` date filters |
 
 ## Verification
+
+The payment-audit relationship requires `payment_audit.payment_id NOT NULL REFERENCES payments(payment_id) ON DELETE RESTRICT`. Existing installations must run `database/migrations/001_payment_audit_payment_fk.sql` as the table owner; it rejects invalid legacy references without deleting or rewriting records. See `database/README.md` for the secure owner command and recovery guidance. Run `npm run test:db` for isolated schema and migration regression tests, and `npm run test:db:live` to verify the migrated permanent database. Both cover payment audit snapshots, NULL/orphan references and restricted payment deletion.
 
 The implementation was verified locally against a fresh PostgreSQL 18 test cluster:
 

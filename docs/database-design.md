@@ -13,9 +13,11 @@ FitTrack stores each kind of fact once and links records through keys. `subscrip
 | `subscriptions` | `subscription_id` | `member_id`, `plan_id`, nullable `trainer_id` | `subscription_id → member_id, plan_id, trainer_id, start_date, end_date, status` |
 | `payments` | `payment_id` | `subscription_id` | `payment_id → subscription_id, amount, payment_date, payment_method, payment_status` |
 | `attendance` | `attendance_id` | `subscription_id` | `attendance_id → subscription_id, check_in_at, check_out_at` |
-| `payment_audit` | `audit_id` | nullable `changed_by` | `audit_id → payment_id, operation, old_values, new_values, changed_at` |
+| `payment_audit` | `audit_id` | required `payment_id`, nullable `changed_by` | `audit_id → payment_id, operation, old_values, new_values, changed_at, changed_by` |
 
-Foreign keys use `RESTRICT` for members, plans, and payments that have historical subscription records; trainer deletion uses `SET NULL` so a former trainer does not erase a membership; audit actor deletion uses `SET NULL`. Database checks constrain dates, durations, amounts, statuses, and payment methods. Indexes support joins and the date/status filters used by the API.
+Foreign keys use `RESTRICT` for referenced members, plans and subscriptions, and for payments that have audit records. Each audit row belongs to exactly one payment; a payment can have many audit rows (1:N). The payment trigger automatically creates an INSERT snapshot and subsequent UPDATE snapshots. The administrator-to-audit relationship remains 1:N with optional attribution because `changed_by` is nullable. Trainer deletion and audit actor deletion use `SET NULL`. Database checks constrain dates, durations, amounts, statuses, and payment methods. Indexes support joins and the date/status filters used by the API.
+
+Existing databases apply `database/migrations/001_payment_audit_payment_fk.sql`. It checks for NULL and orphan payment references before adding the required, validated payment FK in one transaction. Invalid legacy records cause an error and rollback; no audit history is removed or inferred from JSON. New installations receive the same constraint directly from `01_schema.sql`.
 
 ## First Normal Form (1NF)
 
