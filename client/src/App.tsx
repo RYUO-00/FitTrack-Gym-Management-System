@@ -6,6 +6,7 @@ import { AppLayout } from './components/AppLayout';
 import { LoadingState } from './components/QueryState';
 const LoginPage=lazy(()=>import('./pages/LoginPage').then((module)=>({default:module.LoginPage})));
 const DashboardPage=lazy(()=>import('./pages/DashboardPage').then((module)=>({default:module.DashboardPage})));
+const GymsPage=lazy(()=>import('./pages/GymsPage').then((module)=>({default:module.GymsPage})));
 const MembersPage=lazy(()=>import('./pages/MembersPage').then((module)=>({default:module.MembersPage})));
 const TrainersPage=lazy(()=>import('./pages/TrainersPage').then((module)=>({default:module.TrainersPage})));
 const PlansPage=lazy(()=>import('./pages/PlansPage').then((module)=>({default:module.PlansPage})));
@@ -28,6 +29,7 @@ export default function App() {
     <Route path="/login" element={<LoginPage/>}/>
     <Route element={<ProtectedRoutes/>}>
       <Route path="/" element={<DashboardPage/>}/>
+      <Route path="/gyms" element={<GymsPage/>}/>
       <Route path="/members" element={<MembersPage/>}/>
       <Route path="/trainers" element={<TrainersPage/>}/>
       <Route path="/plans" element={<PlansPage/>}/>

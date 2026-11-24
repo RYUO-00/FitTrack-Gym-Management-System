@@ -21,7 +21,8 @@ DECLARE v_start DATE; v_end DATE; v_status TEXT;
 BEGIN
   SELECT start_date,end_date,status INTO v_start,v_end,v_status
   FROM subscriptions WHERE subscription_id=NEW.subscription_id;
-  IF NOT FOUND OR v_status <> 'ACTIVE' OR NEW.check_in_at::DATE NOT BETWEEN v_start AND v_end THEN
+  IF NOT EXISTS (SELECT 1 FROM subscriptions s JOIN gyms g USING(gym_id)
+    WHERE s.subscription_id=NEW.subscription_id AND g.status='ACTIVE') OR v_status <> 'ACTIVE' OR NEW.check_in_at::DATE NOT BETWEEN v_start AND v_end THEN
     RAISE EXCEPTION 'Attendance requires a subscription active on the check-in date'
       USING ERRCODE='23514';
   END IF;

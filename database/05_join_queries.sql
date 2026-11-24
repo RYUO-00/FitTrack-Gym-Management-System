@@ -1,7 +1,7 @@
 -- 9. INNER JOIN: active subscriptions with member and plan names.
 SELECT s.subscription_id,m.member_name,p.plan_name,s.start_date,s.end_date
 FROM subscriptions s INNER JOIN members m ON m.member_id=s.member_id
-INNER JOIN membership_plans p ON p.plan_id=s.plan_id
+INNER JOIN membership_plans p ON p.gym_id=s.gym_id AND p.plan_no=s.plan_no
 WHERE s.status='ACTIVE' AND CURRENT_DATE BETWEEN s.start_date AND s.end_date;
 
 -- 10. LEFT JOIN: retain members who have never subscribed.
@@ -12,7 +12,7 @@ GROUP BY m.member_id,m.member_name ORDER BY subscription_count,m.member_name;
 -- 11. Multiple joins: list paid transactions with member, plan and optional trainer.
 SELECT pay.payment_id,m.member_name,p.plan_name,t.trainer_name,pay.amount,pay.payment_date
 FROM payments pay JOIN subscriptions s ON s.subscription_id=pay.subscription_id
-JOIN members m ON m.member_id=s.member_id JOIN membership_plans p ON p.plan_id=s.plan_id
+JOIN members m ON m.member_id=s.member_id JOIN membership_plans p ON p.gym_id=s.gym_id AND p.plan_no=s.plan_no
 LEFT JOIN trainers t ON t.trainer_id=s.trainer_id WHERE pay.payment_status='PAID'
 ORDER BY pay.payment_date DESC;
 

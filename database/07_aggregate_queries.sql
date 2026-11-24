@@ -10,9 +10,9 @@ FROM payments GROUP BY DATE_TRUNC('month',payment_date) ORDER BY month;
 -- 25. Count plans purchased and total paid per plan.
 SELECT p.plan_name,COUNT(DISTINCT s.subscription_id) AS subscriptions,
   COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_status='PAID'),0)::NUMERIC(12,2) AS revenue
-FROM membership_plans p LEFT JOIN subscriptions s ON s.plan_id=p.plan_id
+FROM membership_plans p LEFT JOIN subscriptions s ON s.gym_id=p.gym_id AND s.plan_no=p.plan_no
 LEFT JOIN payments pay ON pay.subscription_id=s.subscription_id
-GROUP BY p.plan_id,p.plan_name ORDER BY subscriptions DESC;
+GROUP BY p.gym_id,p.plan_no,p.plan_name ORDER BY subscriptions DESC;
 
 -- 26. Trainer member assignment totals with zero-assignment trainers retained.
 SELECT t.trainer_name,COUNT(DISTINCT s.member_id) AS assigned_members

@@ -86,11 +86,11 @@ ROLLBACK;
 -- Procedure smoke test uses an explicit transaction and leaves no extra membership behind.
 BEGIN;
 DO $$
-DECLARE v_subscription_id INTEGER; v_member_id INTEGER; v_plan_id INTEGER;
+DECLARE v_subscription_id INTEGER; v_member_id INTEGER; v_gym_id INTEGER; v_plan_no INTEGER;
 BEGIN
   SELECT member_id INTO v_member_id FROM members ORDER BY member_id LIMIT 1;
-  SELECT plan_id INTO v_plan_id FROM membership_plans WHERE is_active ORDER BY plan_id LIMIT 1;
-  CALL create_subscription(v_member_id,v_plan_id,NULL,CURRENT_DATE,v_subscription_id);
+  SELECT gym_id,plan_no INTO v_gym_id,v_plan_no FROM membership_plans WHERE is_active ORDER BY gym_id,plan_no LIMIT 1;
+  CALL create_subscription(v_member_id,v_gym_id,v_plan_no,NULL,CURRENT_DATE,v_subscription_id);
   IF v_subscription_id IS NULL OR NOT EXISTS (SELECT 1 FROM subscriptions WHERE subscription_id=v_subscription_id) THEN
     RAISE EXCEPTION 'Subscription procedure did not create a record';
   END IF;
@@ -100,12 +100,12 @@ ROLLBACK;
 -- Renewal procedure must insert a new row, preserve the old one, and schedule after current coverage.
 BEGIN;
 DO $$
-DECLARE v_previous_id INTEGER; v_previous_end DATE; v_previous_member INTEGER; v_plan_id INTEGER; v_renewed_id INTEGER; v_renewed_start DATE;
+DECLARE v_previous_id INTEGER; v_previous_end DATE; v_previous_member INTEGER; v_gym_id INTEGER; v_plan_no INTEGER; v_renewed_id INTEGER; v_renewed_start DATE;
 BEGIN
   SELECT subscription_id,member_id,end_date INTO v_previous_id,v_previous_member,v_previous_end
   FROM subscriptions WHERE status='ACTIVE' ORDER BY subscription_id LIMIT 1;
-  SELECT plan_id INTO v_plan_id FROM membership_plans WHERE is_active ORDER BY plan_id LIMIT 1;
-  CALL renew_subscription(v_previous_id,v_plan_id,NULL,CURRENT_DATE,v_renewed_id);
+  SELECT gym_id,plan_no INTO v_gym_id,v_plan_no FROM membership_plans WHERE is_active ORDER BY gym_id,plan_no LIMIT 1;
+  CALL renew_subscription(v_previous_id,v_gym_id,v_plan_no,NULL,CURRENT_DATE,v_renewed_id);
   SELECT start_date INTO v_renewed_start FROM subscriptions WHERE subscription_id=v_renewed_id;
   IF v_renewed_id IS NULL OR v_renewed_id=v_previous_id THEN RAISE EXCEPTION 'Renewal did not create a new key'; END IF;
   IF NOT EXISTS (SELECT 1 FROM subscriptions WHERE subscription_id=v_previous_id AND member_id=v_previous_member) THEN
@@ -123,13 +123,13 @@ DECLARE v_rejected BOOLEAN;
 BEGIN
   v_rejected := FALSE;
   BEGIN
-    INSERT INTO members(member_name,email,phone) VALUES('Duplicate Email Test','maya.kapoor@example.test','+91-90000-99997');
+    INSERT INTO members(gym_id,member_name,email,phone) VALUES((SELECT gym_id FROM gyms ORDER BY gym_id LIMIT 1),'Duplicate Email Test','maya.kapoor@example.test','+91-90000-99997');
   EXCEPTION WHEN unique_violation THEN v_rejected := TRUE;
   END;
   IF NOT v_rejected THEN RAISE EXCEPTION 'Member email uniqueness constraint did not reject duplicate'; END IF;
   v_rejected := FALSE;
   BEGIN
-    INSERT INTO membership_plans(plan_name,duration_months,price) VALUES('Invalid Zero Price',1,0);
+    INSERT INTO membership_plans(gym_id,plan_no,plan_name,duration_months,price) SELECT gym_id,2147483647,'Invalid Zero Price',1,0 FROM gyms ORDER BY gym_id LIMIT 1;
   EXCEPTION WHEN check_violation THEN v_rejected := TRUE;
   END;
   IF NOT v_rejected THEN RAISE EXCEPTION 'Plan price constraint did not reject zero'; END IF;

@@ -1,5 +1,10 @@
+INSERT INTO gyms (branch_name,address,city,contact_number,email)
+VALUES ('FitTrack Main Branch','Main Road, Mangaluru, Karnataka','Mangaluru','+91-90000-30001','main@fittrack.example.test')
+ON CONFLICT (branch_name) DO NOTHING;
+
 -- Fictional demonstration records. Safe to run more than once.
-INSERT INTO members (member_name, email, phone, join_date) VALUES
+INSERT INTO members (gym_id,member_name, email, phone, join_date)
+SELECT g.gym_id,v.* FROM gyms g CROSS JOIN (VALUES
 ('Maya Kapoor','maya.kapoor@example.test','+91-90000-10001',CURRENT_DATE-420),
 ('Arjun Mehta','arjun.mehta@example.test','+91-90000-10002',CURRENT_DATE-390),
 ('Isha Nair','isha.nair@example.test','+91-90000-10003',CURRENT_DATE-365),
@@ -18,26 +23,34 @@ INSERT INTO members (member_name, email, phone, join_date) VALUES
 ('Aarav Bhatia','aarav.bhatia@example.test','+91-90000-10016',CURRENT_DATE-60),
 ('Nisha Roy','nisha.roy@example.test','+91-90000-10017',CURRENT_DATE-35),
 ('Kunal Desai','kunal.desai@example.test','+91-90000-10018',CURRENT_DATE-12)
+) AS v(member_name, email, phone, join_date) WHERE g.branch_name='FitTrack Main Branch'
 ON CONFLICT (email) DO NOTHING;
 
-INSERT INTO trainers (trainer_name,email,phone,specialization) VALUES
+INSERT INTO trainers (gym_id,trainer_name,email,phone,specialization)
+SELECT g.gym_id,v.* FROM gyms g CROSS JOIN (VALUES
 ('Aditi Verma','aditi.verma@example.test','+91-90000-20001','Strength & conditioning'),
 ('Samar Khanna','samar.khanna@example.test','+91-90000-20002','Functional training'),
 ('Leena Thomas','leena.thomas@example.test','+91-90000-20003','Yoga & mobility'),
 ('Ibrahim Sheikh','ibrahim.sheikh@example.test','+91-90000-20004','Boxing & endurance'),
 ('Rhea D''Souza','rhea.dsouza@example.test','+91-90000-20005','Personal training')
+) AS v(trainer_name,email,phone,specialization) WHERE g.branch_name='FitTrack Main Branch'
 ON CONFLICT (email) DO NOTHING;
 
-INSERT INTO membership_plans (plan_name,duration_months,price,description) VALUES
-('Monthly Plan',1,1800.00,'Flexible access, billed monthly.'),
-('Quarterly Plan',3,4800.00,'Three months of full gym access.'),
-('Half-Yearly Plan',6,8900.00,'Six months with guided progress reviews.'),
-('Yearly Plan',12,15900.00,'Best value for a full year of training.')
-ON CONFLICT (plan_name) DO NOTHING;
+INSERT INTO membership_plans (gym_id,plan_no,plan_name,duration_months,price,description)
+SELECT g.gym_id,v.plan_no,v.plan_name,v.duration_months,v.price,v.description
+FROM gyms g CROSS JOIN (VALUES
+(1,'Monthly Plan',1,1800.00,'Flexible access, billed monthly.'),
+(2,'Quarterly Plan',3,4800.00,'Three months of full gym access.'),
+(3,'Half-Yearly Plan',6,8900.00,'Six months with guided progress reviews.'),
+(4,'Yearly Plan',12,15900.00,'Best value for a full year of training.')
+) AS v(plan_no,plan_name,duration_months,price,description)
+WHERE g.branch_name='FitTrack Main Branch'
+-- Preserve existing branch plan numbers, including migrated/gapped identifiers.
+ON CONFLICT DO NOTHING;
 
 -- Multiple subscriptions per member intentionally preserve renewal history.
-INSERT INTO subscriptions (member_id,plan_id,trainer_id,start_date,end_date,status)
-SELECT m.member_id,p.plan_id,t.trainer_id,
+INSERT INTO subscriptions (member_id,gym_id,plan_no,trainer_id,start_date,end_date,status)
+SELECT m.member_id,p.gym_id,p.plan_no,t.trainer_id,
        (CURRENT_DATE - v.months_ago * INTERVAL '1 month')::DATE,
        ((CURRENT_DATE - v.months_ago * INTERVAL '1 month')::DATE + make_interval(months => p.duration_months))::DATE,
        CASE WHEN v.cancelled THEN 'CANCELLED' ELSE 'ACTIVE' END
@@ -68,11 +81,12 @@ FROM (VALUES
  ('tara.bose@example.test','Monthly Plan','rhea.dsouza@example.test',0,FALSE)
 ) AS v(member_email,plan_name,trainer_email,months_ago,cancelled)
 JOIN members m ON m.email=v.member_email
-JOIN membership_plans p ON p.plan_name=v.plan_name
+JOIN gyms g ON g.branch_name='FitTrack Main Branch'
+JOIN membership_plans p ON p.gym_id=g.gym_id AND p.plan_name=v.plan_name
 LEFT JOIN trainers t ON t.email=v.trainer_email
 WHERE NOT EXISTS (
   SELECT 1 FROM subscriptions s
-  WHERE s.member_id=m.member_id AND s.plan_id=p.plan_id
+  WHERE s.member_id=m.member_id AND s.gym_id=p.gym_id AND s.plan_no=p.plan_no
     AND s.start_date=(CURRENT_DATE - v.months_ago * INTERVAL '1 month')::DATE
 );
 

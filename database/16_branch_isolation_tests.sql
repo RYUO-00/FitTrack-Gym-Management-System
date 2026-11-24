@@ -1,0 +1,33 @@
+BEGIN;
+DO $$
+DECLARE g1 INTEGER;g2 INTEGER;m1 INTEGER;m2 INTEGER;t2 INTEGER;sub INTEGER;renewed INTEGER;p INTEGER;rejected BOOLEAN;
+BEGIN
+ INSERT INTO gyms(branch_name,address,city,contact_number,email) VALUES('Scope A '||txid_current(),'Test','Mangaluru','9000012345','scopea@example.test') RETURNING gym_id INTO g1;
+ INSERT INTO gyms(branch_name,address,city,contact_number,email) VALUES('Scope B '||txid_current(),'Test','Udupi','9000012346','scopeb@example.test') RETURNING gym_id INTO g2;
+ INSERT INTO members(gym_id,member_name,email,phone) VALUES(g1,'Scope A Member','a.'||txid_current()||'@example.test','a'||txid_current()) RETURNING member_id INTO m1;
+ INSERT INTO members(gym_id,member_name,email,phone) VALUES(g2,'Scope B Member','b.'||txid_current()||'@example.test','b'||txid_current()) RETURNING member_id INTO m2;
+ INSERT INTO trainers(gym_id,trainer_name,email,phone,specialization) VALUES(g2,'Scope B Trainer','t.'||txid_current()||'@example.test','9000012347','Strength') RETURNING trainer_id INTO t2;
+ INSERT INTO membership_plans(gym_id,plan_no,plan_name,duration_months,price) VALUES(g1,1,'Monthly',1,100),(g2,1,'Monthly',2,200);
+ CALL create_subscription(m1,g1,1,NULL,CURRENT_DATE,sub);
+ CALL renew_subscription(sub,g1,1,NULL,CURRENT_DATE,renewed);
+ IF sub=renewed THEN RAISE EXCEPTION 'Renewal overwrote history';END IF;
+ rejected:=FALSE;BEGIN CALL create_subscription(m2,g1,1,NULL,CURRENT_DATE,renewed);
+ EXCEPTION WHEN foreign_key_violation THEN rejected:=TRUE;END;
+ IF NOT rejected THEN RAISE EXCEPTION 'Cross-branch member accepted';END IF;
+ rejected:=FALSE;BEGIN CALL create_subscription(m1,g1,1,t2,CURRENT_DATE,renewed);
+ EXCEPTION WHEN foreign_key_violation THEN rejected:=TRUE;END;
+ IF NOT rejected THEN RAISE EXCEPTION 'Cross-branch trainer accepted';END IF;
+ UPDATE gyms SET status='INACTIVE' WHERE gym_id=g1;
+ rejected:=FALSE;BEGIN CALL create_subscription(m1,g1,1,NULL,CURRENT_DATE,renewed);
+ EXCEPTION WHEN check_violation THEN rejected:=TRUE;END;
+ IF NOT rejected THEN RAISE EXCEPTION 'Inactive branch accepted subscription';END IF;
+ rejected:=FALSE;BEGIN INSERT INTO attendance(subscription_id) VALUES(sub);
+ EXCEPTION WHEN check_violation THEN rejected:=TRUE;END;
+ IF NOT rejected THEN RAISE EXCEPTION 'Inactive branch accepted check-in';END IF;
+ INSERT INTO payments(subscription_id,amount,payment_method,payment_status) VALUES(sub,1,'CASH','PENDING') RETURNING payment_id INTO p;
+ UPDATE payments SET payment_status='PAID' WHERE payment_id=p;
+ IF (SELECT count(*) FROM payment_audit WHERE payment_id=p)<>2 THEN RAISE EXCEPTION 'Payment history failed';END IF;
+ UPDATE gyms SET status='ACTIVE' WHERE gym_id=g1;
+ INSERT INTO attendance(subscription_id,check_out_at) VALUES(sub,NOW()+INTERVAL '1 hour');
+END $$;
+ROLLBACK;

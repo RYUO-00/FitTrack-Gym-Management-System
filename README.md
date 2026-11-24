@@ -82,7 +82,8 @@ All routes except login, logout, and health require an authenticated admin cooki
 | Dashboard | `GET /api/dashboard` |
 | Members | `GET/POST /api/members`, `GET/PUT/DELETE /api/members/:id`, `GET /api/members/:id/history` |
 | Trainers | `GET/POST /api/trainers`, `GET/PUT/DELETE /api/trainers/:id` |
-| Plans | `GET/POST /api/plans`, `GET/PUT/DELETE /api/plans/:id` |
+| Gyms | `GET/POST /api/gyms`, `GET/PUT/DELETE /api/gyms/:id` |
+| Plans | `GET/POST /api/plans`, `GET/PUT/DELETE /api/plans/:gymId/:planNo` |
 | Subscriptions | `GET/POST /api/subscriptions`, `GET /api/subscriptions/:id`, `POST /api/subscriptions/:id/renew`, `POST /api/subscriptions/:id/cancel` |
 | Payments | `GET/POST /api/payments`, `PATCH /api/payments/:id/status` |
 | Attendance | `GET/POST /api/attendance`, `PATCH /api/attendance/:id/checkout` |
@@ -94,9 +95,19 @@ The payment-audit relationship requires `payment_audit.payment_id NOT NULL REFER
 
 The implementation was verified locally against a fresh PostgreSQL 18 test cluster:
 
-- `npm run typecheck` and `npm run build` passed; route-level code splitting keeps the initial client bundle below 270 kB before gzip.
+- `npm run typecheck` and `npm run build` passed; route-level code splitting keeps the initial client bundle below 280 kB before gzip.
 - `npm audit` reported zero vulnerabilities after dependency updates.
 - All schema, index, function, procedure, trigger, view, seed, transaction, query workbook, and normalization SQL files executed successfully. `database/13_test_queries.sql` validated seed counts, expiry calculation, views, both subscription procedures, payment auditing, attendance eligibility, uniqueness, positive prices, and rollback behavior.
 - An HTTP smoke run verified admin login/logout and route protection; dashboard metrics; member, trainer, and plan CRUD/search; create/renew subscription history; payment insert/status update; check-in/check-out; reports; and foreign-key deletion protection.
 
 The Windows browser automation helper could not establish the open Chrome tab URL, so I did not complete screenshot-based visual QA. The compiled React app and its API workflows were validated through the local build and HTTP checks. No deployment or third-party payment processing is included.
+
+### Gym branches and weak membership plans
+
+`gyms` owns `membership_plans` through the identifying composite primary key `(gym_id, plan_no)`. Existing databases apply [migration 002](database/migrations/002_gym_owned_membership_plans.sql) as the table owner before running the updated app; migration instructions and data-preservation guarantees are in [database/README.md](database/README.md). Fresh setup creates nine tables. Gym CRUD is available at `/api/gyms`; plan operations use `/api/plans/:gymId/:planNo`, and subscription/renewal bodies supply both `gymId` and `planNo`. Existing plan forms include branch selection and a branch-specific number. The Gym branches page manages details and activation; the workspace header switches branches after confirmation. Verify with `npm run test:db`, `npm run test:db:live`, `npm run test:api`, and `npm run build`.
+
+### Full multi-branch setup
+
+Apply [migration 003](database/migrations/003_branch_isolation.sql) as the table owner after migration 002. See [backup, rollback, scope policy and tests](database/README.md). Gym fields are branchName, address, city, contactNumber, email and status. A header selector retains the selected branch during navigation. Branch-specific API requests use X-Gym-Id, checked against the authenticated administrator on every request. Organization admins have NULL admins.gym_id; restricted staff have one assigned gym. No new tables, branch passwords, login flow or ORM were added.
+
+Members/trainers now have branch ownership. Inactive gyms retain history but stop new memberships/check-ins. Plan and subscription forms filter options by their selected branch. Financial correction and checkout remain available for historical records. Exactly nine tables remain; arbitrary staff branch subsets and historical member transfers are outside the implemented model.

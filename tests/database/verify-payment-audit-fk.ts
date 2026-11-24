@@ -8,7 +8,7 @@ import { pool } from '../../server/src/database/pool';
 // Fixture writes in 13_test_queries.sql are rolled back. Sequence gaps are normal.
 async function main() {
   const client = await pool.connect();
-  const tables = ['admins', 'members', 'trainers', 'membership_plans', 'subscriptions',
+  const tables = ['gyms', 'admins', 'members', 'trainers', 'membership_plans', 'subscriptions',
     'payments', 'attendance', 'payment_audit'];
   const snapshot = async () => {
     const values: Record<string, unknown> = {};
@@ -42,10 +42,12 @@ async function main() {
     console.log('PASS persistent schema: ' + constraint.definition + '; payment_id NOT NULL');
     const before = await snapshot();
     await client.query(readFileSync(resolve('database/13_test_queries.sql'), 'utf8'));
+    await client.query(readFileSync(resolve('database/15_gym_weak_entity_tests.sql'), 'utf8'));
+    await client.query(readFileSync(resolve('database/16_branch_isolation_tests.sql'),'utf8'));
     const after = await snapshot();
     assert.deepEqual(after, before, 'Existing table records changed during rollback tests');
     console.log('PASS persistent tests: audit INSERT/UPDATE snapshots, NULL/orphan rejection, RESTRICT deletion, routines and views');
-    console.log('PASS all eight tables retain identical record counts and content fingerprints');
+    console.log('PASS all nine tables retain identical record counts and content fingerprints');
     console.log(JSON.stringify(Object.fromEntries(Object.entries(after).map(([key, value]: [string, any]) => [key, value.rows]))));
     console.log(JSON.stringify((await client.query(`SELECT
       (SELECT count(*)::int FROM pg_constraint WHERE connamespace='public'::regnamespace AND contype='f') AS foreign_keys,

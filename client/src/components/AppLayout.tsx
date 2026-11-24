@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Activity, Banknote, CalendarCheck2, ChartNoAxesCombined, ChevronLeft, ChevronRight, Dumbbell, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings2, Users, X } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Activity, Building2, Banknote, CalendarCheck2, ChartNoAxesCombined, ChevronLeft, ChevronRight, Dumbbell, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings2, Users, X } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { BranchProvider,useBranch } from '../lib/branch';
+import { Select } from './ui/input';
 import { request } from '../lib/api';
 import { useToast } from '../lib/toast';
 import { Button } from './ui/button';
 
 const links = [
   {to:'/',label:'Dashboard',icon:LayoutDashboard},
+  {to:'/gyms',label:'Gym branches',icon:Building2},
   {to:'/members',label:'Members',icon:Users},
   {to:'/trainers',label:'Trainers',icon:Dumbbell},
   {to:'/plans',label:'Membership plans',icon:Activity},
@@ -18,16 +21,17 @@ const links = [
   {to:'/settings',label:'Settings',icon:Settings2},
 ];
 const titles: Record<string,string> = Object.fromEntries(links.map(({to,label})=>[to,label]));
-type User = { adminId:number;email:string;displayName:string };
 
-export function AppLayout() {
+export function AppLayout(){return <BranchProvider><WorkspaceLayout/></BranchProvider>;}
+function WorkspaceLayout() {
+  const {gym,gyms,user,switchBranch}=useBranch();
   const [collapsed,setCollapsed]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
   const location=useLocation();
   const navigate=useNavigate();
   const client=useQueryClient();
   const toast=useToast();
-  const {data:user}=useQuery({queryKey:['me'],queryFn:()=>request.get<{user:User}>('/auth/me').then((value)=>value.user)});
+
   const logout=useMutation({mutationFn:()=>request.post('/auth/logout',{}),onSuccess:()=>{client.clear();navigate('/login');},onError:()=>toast('Could not sign out. Try again.','error')});
   const currentTitle=titles[location.pathname] ?? 'FitTrack';
   const initials=(user?.displayName??'FitTrack Admin').split(' ').map((part)=>part[0]).slice(0,2).join('').toUpperCase();
@@ -69,11 +73,11 @@ export function AppLayout() {
     </div>
     <div className="hidden h-screen shrink-0 lg:sticky lg:top-0 lg:block">{sidebar}</div>
     <div className="min-w-0 flex-1 pt-14 lg:pt-0">
-      <header className="hidden h-[76px] items-center justify-between border-b border-line bg-white px-8 lg:flex">
+      <header className="flex min-h-[76px] flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-4 py-3 lg:px-8">
         <div><p className="text-[11px] font-medium text-muted">Workspace <ChevronRight size={12} className="mx-1 inline"/>{currentTitle}</p><p className="mt-1 text-sm font-semibold text-ink">{currentTitle}</p></div>
-        <div className="flex items-center gap-4"><div className="text-right"><p className="text-xs font-semibold text-ink">{new Intl.DateTimeFormat('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}).format(new Date())}</p><p className="mt-0.5 text-[10px] text-muted">FitTrack admin</p></div><span className="h-8 w-px bg-line"/><Button variant="ghost" size="icon" onClick={()=>setCollapsed(!collapsed)} aria-label="Toggle sidebar" className="hidden"><ChevronLeft size={16}/></Button></div>
+        <div className="flex min-w-0 items-center gap-4"><label className="min-w-0"><span className="mb-1 block text-[10px] font-semibold text-muted">Current branch</span><Select aria-label="Current branch" value={gym.gymId} onChange={(e)=>void switchBranch(Number(e.target.value))} className="max-w-[260px] text-xs">{gyms.map(g=><option key={g.gymId} value={g.gymId}>{g.branchName}{g.status==='INACTIVE'?' (Inactive)':''}</option>)}</Select></label><div className="hidden text-right sm:block"><p className="text-xs font-semibold text-ink">{new Intl.DateTimeFormat('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}).format(new Date())}</p><p className="mt-0.5 text-[10px] text-muted">FitTrack admin</p></div><span className="h-8 w-px bg-line"/><Button variant="ghost" size="icon" onClick={()=>setCollapsed(!collapsed)} aria-label="Toggle sidebar" className="hidden"><ChevronLeft size={16}/></Button></div>
       </header>
-      <main className="mx-auto max-w-[1600px] px-4 pb-10 pt-6 sm:px-6 lg:px-8 lg:pt-7"><Outlet/></main>
+      <main className="mx-auto max-w-[1600px] px-4 pb-10 pt-6 sm:px-6 lg:px-8 lg:pt-7">{gym.status==='INACTIVE'&&<div role="status" className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">This branch is inactive. History remains available; new registrations, memberships and check-ins are stopped. Activate it from Gym branches to resume.</div>}<div key={gym.gymId}><Outlet/></div></main>
     </div>
   </div>;
 }

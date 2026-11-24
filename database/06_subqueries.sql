@@ -1,8 +1,8 @@
 -- 15. Find the most popular plan by subscription count; ties are returned.
-SELECT p.plan_id,p.plan_name,COUNT(*) AS subscriptions
-FROM membership_plans p JOIN subscriptions s ON s.plan_id=p.plan_id
-GROUP BY p.plan_id,p.plan_name HAVING COUNT(*)=(
-  SELECT MAX(plan_total) FROM (SELECT COUNT(*) AS plan_total FROM subscriptions GROUP BY plan_id) totals
+SELECT p.gym_id,p.plan_no,p.plan_name,COUNT(*) AS subscriptions
+FROM membership_plans p JOIN subscriptions s ON s.gym_id=p.gym_id AND s.plan_no=p.plan_no
+GROUP BY p.gym_id,p.plan_no,p.plan_name HAVING COUNT(*)=(
+  SELECT MAX(plan_total) FROM (SELECT COUNT(*) AS plan_total FROM subscriptions GROUP BY gym_id,plan_no) totals
 );
 
 -- 16. Correlated subquery: trainers with the highest assigned member count (ties included).

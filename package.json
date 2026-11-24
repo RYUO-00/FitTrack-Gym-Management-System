@@ -12,9 +12,10 @@
     "build:server": "tsc -p server/tsconfig.json",
     "start": "node server/dist/index.js",
     "admin:create": "tsx server/src/scripts/create-admin.ts",
-    "test:db": "tsx tests/database/payment-audit-fk.ts",
+    "test:db": "tsx tests/database/payment-audit-fk.ts && tsx tests/database/gym-weak-entity.ts && tsx tests/database/branch-isolation.ts",
     "test:db:live": "tsx tests/database/verify-payment-audit-fk.ts",
-    "typecheck": "tsc -p client/tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit"
+    "typecheck": "tsc -p client/tsconfig.json --noEmit && tsc -p server/tsconfig.json --noEmit",
+    "test:api": "tsx tests/database/branch-api.ts && tsx tests/database/multibranch-api.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.6",

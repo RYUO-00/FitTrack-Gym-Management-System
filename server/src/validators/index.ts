@@ -19,13 +19,17 @@ export const trainerSchema = z.object({
   trainerName: z.string().trim().min(2).max(120), email, phone,
   specialization: z.string().trim().min(2).max(100),
 });
+export const gymSchema = z.object({
+  branchName: z.string().trim().min(2).max(120), address: z.string().trim().min(1).max(500),
+  city: z.string().trim().min(2).max(100), contactNumber: phone, email, status: z.enum(['ACTIVE','INACTIVE']).default('ACTIVE'),
+});
 export const planSchema = z.object({
-  planName: z.string().trim().min(2).max(80), durationMonths: z.coerce.number().int().min(1).max(60),
+  gymId: id, planNo: id, planName: z.string().trim().min(2).max(80), durationMonths: z.coerce.number().int().min(1).max(60),
   price: z.coerce.number().positive().max(10000000), description: z.string().trim().max(500).default(''),
   isActive: z.boolean().default(true),
 });
-export const subscriptionSchema = z.object({ memberId: id, planId: id, trainerId: id.nullable().optional(), startDate: isoDate, amount: z.coerce.number().positive().optional(), paymentMethod: z.enum(['CASH','UPI','CARD','BANK_TRANSFER']).optional() });
-export const renewalSchema = z.object({ planId: id, trainerId: id.nullable().optional(), startDate: isoDate.optional(), amount: z.coerce.number().positive().optional(), paymentMethod: z.enum(['CASH','UPI','CARD','BANK_TRANSFER']).optional() });
+export const subscriptionSchema = z.object({ memberId: id, gymId: id, planNo: id, trainerId: id.nullable().optional(), startDate: isoDate, amount: z.coerce.number().positive().optional(), paymentMethod: z.enum(['CASH','UPI','CARD','BANK_TRANSFER']).optional() });
+export const renewalSchema = z.object({ gymId: id, planNo: id, trainerId: id.nullable().optional(), startDate: isoDate.optional(), amount: z.coerce.number().positive().optional(), paymentMethod: z.enum(['CASH','UPI','CARD','BANK_TRANSFER']).optional() });
 export const paymentSchema = z.object({ subscriptionId: id, amount: z.coerce.number().positive(), paymentDate: z.string().datetime().optional(), paymentMethod: z.enum(['CASH','UPI','CARD','BANK_TRANSFER']), paymentStatus: z.enum(['PAID','PENDING','FAILED','REFUNDED']) });
 export const paymentStatusSchema = z.object({ paymentStatus: z.enum(['PAID','PENDING','FAILED','REFUNDED']) });
 export const attendanceSchema = z.object({ subscriptionId: id });

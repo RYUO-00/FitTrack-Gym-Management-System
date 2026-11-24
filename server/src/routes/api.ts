@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import * as gyms from '../controllers/gyms';
+import { requireBranch } from '../middleware/branch';
+import * as plans from '../controllers/plans';
 import * as catalog from '../controllers/catalog';
 import * as subscriptions from '../controllers/subscriptions';
 import * as payments from '../controllers/payments';
@@ -7,10 +10,17 @@ import { dashboard } from '../controllers/dashboard';
 import { reports } from '../controllers/reports';
 import { validateBody } from '../middleware/validate';
 import { authenticate } from '../middleware/auth';
-import { memberSchema, trainerSchema, planSchema, subscriptionSchema, renewalSchema, paymentSchema, paymentStatusSchema, attendanceSchema } from '../validators';
+import { memberSchema, trainerSchema, gymSchema, planSchema, subscriptionSchema, renewalSchema, paymentSchema, paymentStatusSchema, attendanceSchema } from '../validators';
 
 export const apiRoutes = Router();
 apiRoutes.use(authenticate);
+apiRoutes.get('/gyms', gyms.list);
+apiRoutes.post('/gyms', validateBody(gymSchema), gyms.create);
+apiRoutes.get('/gyms/:id', gyms.getOne);
+apiRoutes.put('/gyms/:id', validateBody(gymSchema), gyms.update);
+apiRoutes.delete('/gyms/:id', gyms.remove);
+
+apiRoutes.use(requireBranch);
 apiRoutes.get('/dashboard', dashboard);
 
 apiRoutes.get('/members', catalog.list('members'));
@@ -26,11 +36,11 @@ apiRoutes.get('/trainers/:id', catalog.getOne('trainers'));
 apiRoutes.put('/trainers/:id', validateBody(trainerSchema), catalog.update('trainers'));
 apiRoutes.delete('/trainers/:id', catalog.remove('trainers'));
 
-apiRoutes.get('/plans', catalog.list('plans'));
-apiRoutes.post('/plans', validateBody(planSchema), catalog.create('plans'));
-apiRoutes.get('/plans/:id', catalog.getOne('plans'));
-apiRoutes.put('/plans/:id', validateBody(planSchema), catalog.update('plans'));
-apiRoutes.delete('/plans/:id', catalog.remove('plans'));
+apiRoutes.get('/plans', plans.list);
+apiRoutes.post('/plans', validateBody(planSchema), plans.create);
+apiRoutes.get('/plans/:gymId/:planNo', plans.getOne);
+apiRoutes.put('/plans/:gymId/:planNo', validateBody(planSchema), plans.update);
+apiRoutes.delete('/plans/:gymId/:planNo', plans.remove);
 
 apiRoutes.get('/subscriptions', subscriptions.list);
 apiRoutes.post('/subscriptions', validateBody(subscriptionSchema), subscriptions.create);
